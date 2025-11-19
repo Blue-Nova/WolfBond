@@ -1,0 +1,9 @@
+name: StrongWolf
+version: '1.0'
+main: io.github.bluenova.strongWolf.StrongWolfPlugin
+api-version: '1.21'
+commands:
+    strongwolf:
+        description: Main command for the StrongWolf plugin.
+        usage: /<command> [subcommand]
+        aliases: [sw, strong]
