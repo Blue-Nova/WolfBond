@@ -1,5 +1,6 @@
 package io.github.bluenova.strongWolf;
 
+import io.github.bluenova.strongWolf.ui.UIManager;
 import net.kyori.adventure.bossbar.BossBar;
 import org.bukkit.entity.Boss;
 import org.bukkit.entity.LivingEntity;
@@ -35,5 +36,14 @@ public class WolfOwner {
         }
         lastBossBar = bossBar;
         player.showBossBar(lastBossBar);
+    }
+
+    public void remove() {
+        if (lastBossBar != null) {
+            player.hideBossBar(lastBossBar);
+        }
+        // remove scoreboard
+        player.setScoreboard(player.getServer().getScoreboardManager().getNewScoreboard());
+        UIManager.removeUIFromPlayer(player);
     }
 }

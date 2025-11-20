@@ -1,6 +1,7 @@
 package io.github.bluenova.strongWolf;
 
 
+import io.github.bluenova.strongWolf.ui.UIManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.attribute.Attribute;
@@ -11,12 +12,27 @@ import java.util.Objects;
 
 public class BondWolf {
 
-    static final int RESPAWN_COOLDOWN = 40; // in seconds
+    public static final int RESPAWN_COOLDOWN = 40; // in seconds
+    private static final float BASE_SPEED = 0.25f;
+    private static final float BASE_STRENGTH = 1f;
+    private static final float BASE_HEALTH = 2f;
+    private static final float BASE_WATER_MOVEMENT_EFFICIENCY = 1.0f;
+    private static final float BASE_SCALE = 0.06f;
 
+
+    private static final float SPEED_INCREMENT = 0.15f;
+    private static final float STRENGTH_INCREMENT = 0.33f;
+    private static final float HEALTH_INCREMENT = 1.5f;
+    private static final float SCALE_INCREMENT = 0.02f;
+
+    private int level = 0;
     private int deathCooldown = 0;
-    private int strength;
-    private int health;
-    private int speed;
+    private float strength;
+    private float max_health;
+    private float speed;
+    private float scale;
+
+    private int nextUpgradeIndex = 0;
 
     private org.bukkit.entity.Wolf wolfEntity;
 
@@ -24,9 +40,10 @@ public class BondWolf {
 
     public BondWolf(WolfOwner owner) {
         this.owner = owner;
-        this.strength = 2;
-        this.health = 20;
-        this.speed = 0;
+        this.strength = BASE_STRENGTH;
+        this.max_health = BASE_HEALTH*2;
+        this.speed = BASE_SPEED;
+        this.scale = BASE_SCALE;
         spawnWolf();
     }
 
@@ -62,42 +79,71 @@ public class BondWolf {
         wolfEntity.setSitting(false);
 
         // ---- CUSTOM ATTRIBUTES ----
-        // Health
-        Objects.requireNonNull(wolfEntity.getAttribute(Attribute.MAX_HEALTH))
-                .setBaseValue(this.health);
-        wolfEntity.setHealth(this.health);
 
-        // Strength → Attack damage
-        Objects.requireNonNull(wolfEntity.getAttribute(Attribute.ATTACK_DAMAGE))
-                .setBaseValue(this.strength);
+        reapplyAttributes();
 
-        // Speed
-        Objects.requireNonNull(wolfEntity.getAttribute(Attribute.MOVEMENT_SPEED))
-                .setBaseValue(0.35 + (this.speed * 0.06));
+        UIManager.sendWolfRespawnMessage(owner.getPlayer(), this);
     }
 
-    public void upgradeStrength(int amount) {
-        this.strength += amount;
-        if (wolfEntity != null && !wolfEntity.isDead()) {
-            Objects.requireNonNull(wolfEntity.getAttribute(Attribute.ATTACK_DAMAGE))
-                    .setBaseValue(this.strength);
-        }
-    }
-
-    public void upgradeHealth(int amount) {
-        this.health += amount;
+    public void reapplyAttributes() {
         if (wolfEntity != null && !wolfEntity.isDead()) {
             Objects.requireNonNull(wolfEntity.getAttribute(Attribute.MAX_HEALTH))
-                    .setBaseValue(this.health);
-            wolfEntity.setHealth(this.health);
+                    .setBaseValue(this.max_health);
+
+            Objects.requireNonNull(wolfEntity.getAttribute(Attribute.ATTACK_DAMAGE))
+                    .setBaseValue(this.strength);
+
+            Objects.requireNonNull(wolfEntity.getAttribute(Attribute.MOVEMENT_SPEED))
+                    .setBaseValue(BASE_SPEED + (this.speed * 0.06));
+
+            Objects.requireNonNull(wolfEntity.getAttribute(Attribute.WATER_MOVEMENT_EFFICIENCY))
+                    .setBaseValue(BASE_WATER_MOVEMENT_EFFICIENCY + (this.speed * 0.02));
+
+            Objects.requireNonNull(wolfEntity.getAttribute(Attribute.SCALE))
+                    .setBaseValue(this.scale);
+
+            Objects.requireNonNull(wolfEntity.getAttribute(Attribute.STEP_HEIGHT))
+                    .setBaseValue(0.5 + (this.scale * 1.5));
+
+            Objects.requireNonNull(wolfEntity.getAttribute(Attribute.SAFE_FALL_DISTANCE))
+                    .setBaseValue(1.5 + this.scale * 6);
+
+            Objects.requireNonNull(wolfEntity.getAttribute(Attribute.JUMP_STRENGTH))
+                    .setBaseValue(0.5 + (this.scale));
         }
     }
 
-    public void upgradeSpeed(int amount) {
-        this.speed += amount;
+    public void upgradeStrength() {
+        this.strength += STRENGTH_INCREMENT;
         if (wolfEntity != null && !wolfEntity.isDead()) {
-            Objects.requireNonNull(wolfEntity.getAttribute(Attribute.MOVEMENT_SPEED))
-                    .setBaseValue(0.25 + (this.speed * 0.02));
+            reapplyAttributes();
+        }
+    }
+
+    public void upgradeHealth() {
+        this.max_health += HEALTH_INCREMENT;
+        if (wolfEntity != null && !wolfEntity.isDead()) {
+            reapplyAttributes();
+        }
+    }
+
+    public void upgradeSpeed() {
+        this.speed += SPEED_INCREMENT;
+        if (wolfEntity != null && !wolfEntity.isDead()) {
+            reapplyAttributes();
+        }
+    }
+
+    public void upgradeWaterEfficiency() {
+        if (wolfEntity != null && !wolfEntity.isDead()) {
+            reapplyAttributes();
+        }
+    }
+
+    public void upgradeScale() {
+        this.scale += SCALE_INCREMENT;
+        if (wolfEntity != null && !wolfEntity.isDead()) {
+            reapplyAttributes();
         }
     }
 
@@ -110,10 +156,10 @@ public class BondWolf {
             wolfEntity.remove();
         }
         this.deathCooldown = RESPAWN_COOLDOWN;
+        UIManager.sendWolfDeathMessage(owner.getPlayer(), this);
         // You might want to implement a scheduler to decrease this cooldown over time
         Bukkit.getScheduler().runTaskTimer(StrongWolfPlugin.getPlugin(), task -> {
             deathCooldown--;
-            owner.getPlayer().sendMessage("Your wolf will respawn in " + deathCooldown + " seconds.");
             if (deathCooldown <= 0) {
                 respawn();
                 task.cancel();
@@ -121,25 +167,78 @@ public class BondWolf {
         }, 20L, 20L); // Runs every second
     }
 
-    public int getStrength() {
+    public float getStrength() {
         return strength;
     }
     public int getHealth() {
-        return health;
+        return wolfEntity != null ? (int) wolfEntity.getHealth() : 0;
     }
-    public int getSpeed() {
+    public float getSpeed() {
         return speed;
+    }
+    public float getScale() {
+        return scale;
     }
 
     public Entity getWolfEntity() {
         return wolfEntity;
     }
 
+    public int getLevel() {
+        return level;
+    }
+
     public double getHealthPercent() {
         if (wolfEntity != null && !wolfEntity.isDead()) {
-            return (wolfEntity.getHealth() / wolfEntity.getAttribute(Attribute.MAX_HEALTH).getBaseValue());
+            return (wolfEntity.getHealth() / Objects.requireNonNull(wolfEntity.getAttribute(Attribute.MAX_HEALTH)).getBaseValue());
         }
-        owner.getPlayer().sendMessage("§cYour wolf is dead!");
         return 0f;
+    }
+
+    public double getMaxHealth() {
+        return max_health;
+    }
+
+    public String getState() {
+        if (wolfEntity == null || wolfEntity.isDead()) {
+            return "Dead";
+        } else if (wolfEntity.getTarget() != null) {
+            return "Attacking";
+        } else {
+            return "Idle";
+        }
+    }
+
+    public void upgradeAttributes() {
+        if (nextUpgradeIndex >= 2) {
+            nextUpgradeIndex = 0;
+            upgradeHealth();
+            upgradeSpeed();
+            upgradeStrength();
+            upgradeWaterEfficiency();
+            UIManager.sendWolfUpgradeMessage(owner.getPlayer(), this);
+            level++;
+        }else nextUpgradeIndex++;
+        generalUpgrade();
+    }
+
+    private void generalUpgrade() {
+        // general upgrade that applies to all upgrades
+        upgradeScale();
+        wolfEntity.setHealth(wolfEntity.getHealth() + 2); // heal 1 heart on upgrade
+    }
+
+    public void remove() {
+        if (wolfEntity != null && !wolfEntity.isDead()) {
+            wolfEntity.remove();
+            wolfEntity.setHealth(0);
+        }
+    }
+
+    public void sit() {
+        if (wolfEntity != null && !wolfEntity.isDead()) {
+            wolfEntity.setSitting(true);
+            wolfEntity.setTarget(null);
+        }
     }
 }

@@ -10,11 +10,12 @@ public class BondKeeper {
 
     HashMap<WolfOwner,BondWolf> bondList = new HashMap<>();
 
-    public void addBond(WolfOwner bond) {
-        if (isPlayerPaired(bond.getPlayer())) {
-            bond.getPlayer().sendMessage("§cYou already have a bonded wolf!");
+    public void addBond(Player player) {
+        if (isPlayerPaired(player)) {
+            player.sendMessage("§cYou already have a bonded wolf!");
             return;
         }
+        WolfOwner bond = new WolfOwner(player);
         bondList.put(bond, bond.getWolf());
         bond.getPlayer().sendMessage("§aYou have successfully bonded with a wolf!");
     }
@@ -63,10 +64,23 @@ public class BondKeeper {
         WolfOwner owner = getOwnerFromPlayer(player);
         if (owner != null && isWolfBonded(rightClicked)) {
             BondWolf bondWolf = bondList.get(owner);
-            bondWolf.upgradeStrength(1);
-            player.sendMessage("§aYour bonded wolf has been upgraded!");
+            // upgrade attributes in a one by one manner
+            bondWolf.upgradeAttributes();
         } else {
             player.sendMessage("§cThis wolf is not bonded to you.");
+        }
+    }
+
+    public void removeBond(Player player) {
+        WolfOwner owner = getOwnerFromPlayer(player);
+        if (owner != null) {
+            BondWolf bondWolf = bondList.get(owner);
+            bondWolf.remove();
+            owner.remove();
+            bondList.remove(owner);
+            player.sendMessage("§aYour bond with your wolf has been removed.");
+        } else {
+            player.sendMessage("§cYou do not have a bonded wolf to remove.");
         }
     }
 }

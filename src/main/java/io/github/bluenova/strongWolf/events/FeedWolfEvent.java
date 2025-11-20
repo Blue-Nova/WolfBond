@@ -26,7 +26,9 @@ public class FeedWolfEvent implements Listener {
         if (type == Material.BONE) {
             if (plugin.getBondKeeper().isWolfBonded((Wolf) event.getRightClicked())) {
                 plugin.getBondKeeper().upgradeBond(event.getPlayer(), (Wolf) event.getRightClicked());
-            } else {
+                // remove one bone from player's hand
+                hand.setAmount(hand.getAmount() - 1);
+                event.setCancelled(true);
             }
             return;
         }

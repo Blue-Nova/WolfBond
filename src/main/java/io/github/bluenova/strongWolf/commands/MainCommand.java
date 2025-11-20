@@ -1,6 +1,7 @@
 package io.github.bluenova.strongWolf.commands;
 
 import io.github.bluenova.strongWolf.commands.subcommands.CreateBond;
+import io.github.bluenova.strongWolf.commands.subcommands.RemoveBond;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -17,9 +18,9 @@ public class MainCommand implements CommandExecutor, TabCompleter {
 
     public MainCommand() {
         this.subCommands = Map.of(
-                "createbond", new CreateBond()
+                "createbond", new CreateBond(),
+                "removebond", new RemoveBond()
         );
-
     }
 
     @Override

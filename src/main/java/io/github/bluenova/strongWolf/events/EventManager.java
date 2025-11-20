@@ -15,5 +15,6 @@ public class EventManager {
         pluginManager.registerEvents(new FeedWolfEvent(), StrongWolfPlugin.getPlugin());
         pluginManager.registerEvents(new RightClickEvent(), StrongWolfPlugin.getPlugin());
         pluginManager.registerEvents(new WolfDeathEvent(), StrongWolfPlugin.getPlugin());
+        pluginManager.registerEvents(new WolfKillEntityEvent(), StrongWolfPlugin.getPlugin());
     }
 }
