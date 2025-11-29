@@ -4,6 +4,7 @@ import io.github.bluenova.strongWolf.BondKeeper;
 import io.github.bluenova.strongWolf.BondWolf;
 import io.github.bluenova.strongWolf.StrongWolfPlugin;
 import io.github.bluenova.strongWolf.WolfOwner;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -24,6 +25,10 @@ public class RightClickEvent implements Listener {
 
         // Defensive: ensure clicked block exists
         if (event.getClickedBlock() == null) return;
+
+        // check that player's hand is empty
+        Material handType = event.getPlayer().getInventory().getItemInMainHand().getType();
+        if (handType != Material.AIR) return;
 
         // TODO: Replace with real handling logic (call plugin API, custom event, etc.)
 

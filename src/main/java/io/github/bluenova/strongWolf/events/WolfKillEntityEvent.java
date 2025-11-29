@@ -43,17 +43,11 @@ public class WolfKillEntityEvent implements Listener {
             World world = loc.getWorld();
             if (world != null) {
                 // Chance to drop a bone upon killing an entity
-                plugin.getLogger().info("Bonded wolf has killed an entity, checking for bone drop...");
-                plugin.getLogger().info("Bone drop succeeded!");
+                plugin.getLogger().info("Bonded wolf has killed an entity, doing bone drop...");
                 world.dropItem(loc, new ItemStack(Material.BONE, 1));
-                float dropChance = 0.50f; // 25% chance
+                float dropChance = 0.55f; // 55% chance
                 if (Math.random() < dropChance) {
-                    plugin.getLogger().info("Bone drop succeeded!");
-                    world.dropItem(loc, new ItemStack(Material.BONE, 1));
-                }
-                float rareDropChance = 0.20f; // 10% chance for rare drop
-                if (Math.random() < rareDropChance) {
-                    plugin.getLogger().info("Rare drop (Bone) succeeded!");
+                    plugin.getLogger().info("Extra Bone drop succeeded!");
                     world.dropItem(loc, new ItemStack(Material.BONE, 1));
                 }
             }

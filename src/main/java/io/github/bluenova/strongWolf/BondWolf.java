@@ -5,49 +5,76 @@ import io.github.bluenova.strongWolf.ui.UIManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.entity.EnderDragon;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Wolf;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.util.Objects;
 
 public class BondWolf {
 
-    public static final int RESPAWN_COOLDOWN = 40; // in seconds
-    private static final float BASE_SPEED = 0.25f;
-    private static final float BASE_STRENGTH = 1f;
-    private static final float BASE_HEALTH = 2f;
-    private static final float BASE_WATER_MOVEMENT_EFFICIENCY = 1.0f;
-    private static final float BASE_SCALE = 0.06f;
+    /**
+     * WOLF'S BASE VANILLA ATTRIBUTES (tamed, normal difficulty):
+     * - Health: 40
+     * - Speed: 0.3
+     * - Strength: 4 <- (level 10 buffed to 8)
+     *
+     *  At LEVEL 10, the will should be on par with the base attributes of a tamed wolf.
+     *  Current calculations:
+     *  - Health: 5 + (3.5 * 10) = 40
+     *  - Speed: 0.2 + (0.01 * 10) = 0.3
+     *  - Strength: 2 + (0.6 * 10) = 8
+     *  - Scale: 0.01 + (0.033 * 30) = 1 <- scale is different, it needs 40 bones to reach level 10
+     *  so X should be 0.02
+     *  - Water Movement Efficiency: 1.0 + (0.025 * 10) = 1.2
+     *  -----------------------------
+     */
+
+    public static final int RESPAWN_COOLDOWN = 30; // in seconds
+    private static final float BASE_SPEED = 0.2f;
+    private static final float BASE_STRENGTH = 2f;
+    private static final float BASE_HEALTH = 5f;
+    private static final float BASE_SCALE = 0.01f;
 
 
-    private static final float SPEED_INCREMENT = 0.15f;
-    private static final float STRENGTH_INCREMENT = 0.33f;
-    private static final float HEALTH_INCREMENT = 1.5f;
-    private static final float SCALE_INCREMENT = 0.02f;
+    private static final float SPEED_INCREMENT = 0.01f;
+    private static final float STRENGTH_INCREMENT = 0.6f;
+    private static final float HEALTH_INCREMENT = 3.5f;
+    private static final float SCALE_INCREMENT = 0.033f;
 
     private int level = 0;
     private int deathCooldown = 0;
-    private float strength;
-    private float max_health;
-    private float speed;
-    private float scale;
 
-    private int nextUpgradeIndex = 0;
-
-    private org.bukkit.entity.Wolf wolfEntity;
+    private Wolf wolfEntity;
 
     private final WolfOwner owner;
 
+    private int max_level = 0;
+    private boolean wolf_capped = false;
+
+    // Bucket scheduled task (empty for now) that runs while the wolf is alive/respawned
+    private BukkitTask bucketTask;
+
     public BondWolf(WolfOwner owner) {
         this.owner = owner;
-        this.strength = BASE_STRENGTH;
-        this.max_health = BASE_HEALTH*2;
-        this.speed = BASE_SPEED;
-        this.scale = BASE_SCALE;
+
+        // initialize a boilerplate bucket task that runs every 15 ticks
+        // This is a harmless placeholder — actual behavior can be implemented inside run().
+        bucketTask = new BukkitRunnable() {
+            @Override
+            public void run() {
+            }
+        }.runTaskTimer(StrongWolfPlugin.getPlugin(), 0L, 20L);
+
         spawnWolf();
     }
 
     public void respawn() {
+        // ensure any running bucket task is stopped before respawning
+        stopBucketTask();
         if (wolfEntity != null && !wolfEntity.isDead()) {
             wolfEntity.remove();
         }
@@ -83,36 +110,88 @@ public class BondWolf {
         reapplyAttributes();
 
         UIManager.sendWolfRespawnMessage(owner.getPlayer(), this);
+
+        // start the bucket scheduled task when the wolf respawns
+        startBucketTask();
+    }
+
+    /**
+     * Starts a simple scheduled bucket task. The body is intentionally empty for now.
+     * The task is run every 20 ticks (1 second).
+     */
+    private void startBucketTask() {
+        // stop any existing task first
+        stopBucketTask();
+        bucketTask = new BukkitRunnable() {
+            @Override
+            public void run() {
+                // If the wolf doesn't exist or is dead, nothing to do
+                if (wolfEntity == null || wolfEntity.isDead()) return;
+
+                // Damage any Ender Dragon within a 4-block radius by the wolf's strength
+                double radius = 4.0;
+                double damage = getStrength();
+                for (Entity e : wolfEntity.getNearbyEntities(radius, radius, radius)) {
+                    if (e instanceof EnderDragon) {
+                        try {
+                            // attribute the damage to the wolf entity
+                            ((EnderDragon) e).setHealth(Math.max(((EnderDragon) e).getHealth() - damage, 0) );
+                        } catch (Exception notIgnored) {
+                            StrongWolfPlugin.getPlugin().getLogger().warning("Failed to apply damage to Ender Dragon:" + notIgnored.getMessage());
+                        }
+                    }
+                }
+            }
+        }.runTaskTimer(StrongWolfPlugin.getPlugin(), 0L, 15L);
+    }
+
+    private void stopBucketTask() {
+        if (bucketTask != null) {
+            try {
+                bucketTask.cancel();
+            } catch (IllegalStateException ignored) {
+                // If the scheduler is shutting down or task already cancelled, ignore
+            }
+            bucketTask = null;
+        }
     }
 
     public void reapplyAttributes() {
         if (wolfEntity != null && !wolfEntity.isDead()) {
+            // divide levels by 3
+            int effectiveLevel = (int) Math.floor(this.level / 3.0);
             Objects.requireNonNull(wolfEntity.getAttribute(Attribute.MAX_HEALTH))
-                    .setBaseValue(this.max_health);
+                    .setBaseValue(BASE_HEALTH + (HEALTH_INCREMENT * effectiveLevel));
 
+            // every three levels, increase strength
             Objects.requireNonNull(wolfEntity.getAttribute(Attribute.ATTACK_DAMAGE))
-                    .setBaseValue(this.strength);
+                    .setBaseValue(BASE_STRENGTH + (STRENGTH_INCREMENT * effectiveLevel));
 
             Objects.requireNonNull(wolfEntity.getAttribute(Attribute.MOVEMENT_SPEED))
-                    .setBaseValue(BASE_SPEED + (this.speed * 0.06));
+                    .setBaseValue(BASE_SPEED + (SPEED_INCREMENT * effectiveLevel));
 
             Objects.requireNonNull(wolfEntity.getAttribute(Attribute.WATER_MOVEMENT_EFFICIENCY))
-                    .setBaseValue(BASE_WATER_MOVEMENT_EFFICIENCY + (this.speed * 0.02));
+                    .setBaseValue(BASE_SPEED * (SPEED_INCREMENT * effectiveLevel));
 
             Objects.requireNonNull(wolfEntity.getAttribute(Attribute.SCALE))
-                    .setBaseValue(this.scale);
+                    .setBaseValue(BASE_SCALE + (SCALE_INCREMENT * this.level));
 
             Objects.requireNonNull(wolfEntity.getAttribute(Attribute.STEP_HEIGHT))
-                    .setBaseValue(0.5 + (this.scale * 1.5));
+                    .setBaseValue(0.5 + (this.level * 0.1));
 
             Objects.requireNonNull(wolfEntity.getAttribute(Attribute.SAFE_FALL_DISTANCE))
-                    .setBaseValue(1.5 + this.scale * 6);
+                    .setBaseValue(1.5 + (this.level * 0.3));
 
             Objects.requireNonNull(wolfEntity.getAttribute(Attribute.JUMP_STRENGTH))
-                    .setBaseValue(0.5 + (this.scale));
+                    .setBaseValue(0.5 + (this.level * 0.1));
+
+            // past level 20, start increasing knockback resistance
+            Objects.requireNonNull(wolfEntity.getAttribute(Attribute.KNOCKBACK_RESISTANCE))
+                    .setBaseValue(Math.max((this.level-20) * 0.02, 0f));
         }
     }
 
+    /**
     public void upgradeStrength() {
         this.strength += STRENGTH_INCREMENT;
         if (wolfEntity != null && !wolfEntity.isDead()) {
@@ -146,6 +225,7 @@ public class BondWolf {
             reapplyAttributes();
         }
     }
+    */
 
     public synchronized int getDeathCooldown() {
         return deathCooldown;
@@ -155,6 +235,8 @@ public class BondWolf {
         if (wolfEntity != null) {
             wolfEntity.remove();
         }
+        // stop bucket task when the wolf dies
+        stopBucketTask();
         this.deathCooldown = RESPAWN_COOLDOWN;
         UIManager.sendWolfDeathMessage(owner.getPlayer(), this);
         // You might want to implement a scheduler to decrease this cooldown over time
@@ -168,16 +250,20 @@ public class BondWolf {
     }
 
     public float getStrength() {
-        return strength;
+        return wolfEntity != null ? (float) Objects.requireNonNull(wolfEntity.getAttribute(Attribute.ATTACK_DAMAGE)).getBaseValue() : 0f;
     }
     public int getHealth() {
         return wolfEntity != null ? (int) wolfEntity.getHealth() : 0;
     }
     public float getSpeed() {
-        return speed;
+        return wolfEntity != null ? (float) Objects.requireNonNull(wolfEntity.getAttribute(Attribute.MOVEMENT_SPEED)).getBaseValue() : 0f;
     }
     public float getScale() {
-        return scale;
+        return wolfEntity != null ? (float) Objects.requireNonNull(wolfEntity.getAttribute(Attribute.SCALE)).getBaseValue() : 0f;
+    }
+
+    public double getMaxHealth() {
+        return wolfEntity != null ? Objects.requireNonNull(wolfEntity.getAttribute(Attribute.MAX_HEALTH)).getBaseValue() : 0f;
     }
 
     public Entity getWolfEntity() {
@@ -195,41 +281,32 @@ public class BondWolf {
         return 0f;
     }
 
-    public double getMaxHealth() {
-        return max_health;
-    }
-
     public String getState() {
         if (wolfEntity == null || wolfEntity.isDead()) {
             return "Dead";
         } else if (wolfEntity.getTarget() != null) {
             return "Attacking";
+        } else if (wolfEntity.isSitting()) {
+            return "Sitting";
         } else {
-            return "Idle";
+            return "Following";
         }
     }
 
     public void upgradeAttributes() {
-        if (nextUpgradeIndex >= 2) {
-            nextUpgradeIndex = 0;
-            upgradeHealth();
-            upgradeSpeed();
-            upgradeStrength();
-            upgradeWaterEfficiency();
-            UIManager.sendWolfUpgradeMessage(owner.getPlayer(), this);
+        if (!wolf_capped){
             level++;
-        }else nextUpgradeIndex++;
-        generalUpgrade();
-    }
-
-    private void generalUpgrade() {
-        // general upgrade that applies to all upgrades
-        upgradeScale();
-        wolfEntity.setHealth(wolfEntity.getHealth() + 2); // heal 1 heart on upgrade
+        }
+        max_level++;
+        UIManager.sendWolfUpgradeMessage(owner.getPlayer(), this);
+        reapplyAttributes();
+        wolfEntity.heal(4.0); // Heal 4 health points on upgrade
     }
 
     public void remove() {
         if (wolfEntity != null && !wolfEntity.isDead()) {
+            // stop the bucket task when explicitly removing the wolf
+            stopBucketTask();
             wolfEntity.remove();
             wolfEntity.setHealth(0);
         }
@@ -241,4 +318,32 @@ public class BondWolf {
             wolfEntity.setTarget(null);
         }
     }
+
+    public void setLevel(int level) {
+        if (level < 0) {
+            level = 0;
+        }
+        if (level > max_level) {
+            level = max_level;
+        }
+        // if level is lower than max_level, set wolf_capped to true
+        if (level < max_level) {
+            wolf_capped = true;
+        }
+        // if level is equal to max_level, set wolf_capped to false
+        if (level == max_level) {
+            wolf_capped = false;
+        }
+        this.level = level;
+        reapplyAttributes();
+    }
+
+    public int getMaxLevel() {
+        return max_level;
+    }
+
+    public boolean isWolfCapped() {
+        return wolf_capped;
+    }
+
 }

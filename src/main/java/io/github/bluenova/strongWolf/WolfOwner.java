@@ -43,7 +43,6 @@ public class WolfOwner {
             player.hideBossBar(lastBossBar);
         }
         // remove scoreboard
-        player.setScoreboard(player.getServer().getScoreboardManager().getNewScoreboard());
         UIManager.removeUIFromPlayer(player);
     }
 }

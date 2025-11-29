@@ -87,7 +87,7 @@ public class UIManager {
         if (!player.isOnline()) {
             return;
         }
-
+        if (!StrongWolfPlugin.getPlugin().getBondKeeper().isPlayerPaired(owner.getPlayer())) return;
         // Schedule scoreboard work on the main server thread (Bukkit API must run on main thread)
         StrongWolfPlugin.getPlugin().getServer().getScheduler().runTask(StrongWolfPlugin.getPlugin(), () -> {
             ScoreboardManager mgr = Bukkit.getScoreboardManager();
@@ -114,12 +114,18 @@ public class UIManager {
             String speed = df.format(wolf.getSpeed());
 
             // Build a neat layout (higher score appears higher on the sidebar)
-            obj.getScore("§7---- §fLvL:" + "§e"+level + " §7----").setScore(6);
-            obj.getScore("§eHealth: §a" + health + " / " + maxHealth).setScore(5);
-            obj.getScore("§eStrength: §c" + strength).setScore(4);
-            obj.getScore("§eSpeed: §b" + speed).setScore(3);
-            obj.getScore(" ").setScore(2);
-            obj.getScore("§eState: §f" +wolf.getState()).setScore(1);
+            obj.getScore("§7---- §fLvL:" + "§e"+level + " §7----").setScore(7);
+            obj.getScore("§eHealth: §a" + health + " / " + maxHealth).setScore(6);
+            obj.getScore("§eStrength: §c" + strength).setScore(5);
+            obj.getScore("§eSpeed: §b" + speed).setScore(4);
+            obj.getScore(" ").setScore(3);
+            obj.getScore("§eState: §f" +wolf.getState()).setScore(2);
+            String capped = "";
+            if (wolf.isWolfCapped()){
+                capped = "§c (CAPPED)";
+            }
+            obj.getScore("§eMax Level: §f" + wolf.getMaxLevel() + capped).setScore(1);
+            obj.getScore("§7----------------").setScore(0);
 
             player.setScoreboard(board);
         });
