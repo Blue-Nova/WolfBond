@@ -1,5 +1,7 @@
 name: StrongWolf
-version: '1.0'
+version: '1.2.0'
+author: BlueNova
+description: If AI was to describe this plugin, it would say "Unleash the power of the wolf within your Minecraft world with StrongWolf, the ultimate plugin for enhancing wolf behavior and abilities!"
 main: io.github.bluenova.strongWolf.StrongWolfPlugin
 api-version: '1.21'
 commands:
